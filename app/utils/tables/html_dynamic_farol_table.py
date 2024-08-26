@@ -1,9 +1,18 @@
+import sys
+import base64
 from pathlib import Path
 
 import pandas as pd
+import streamlit as st
+from loguru import logger
 
-from typing import Dict, List
+DIR_ROOT = str(Path(__file__).parent.parent.parent)
+sys.path.append(DIR_ROOT)
+
 from dataclasses import dataclass
+from typing import Dict, List
+import pandas as pd
+import streamlit as st
 from streamlit.components.v1 import html
 
 
@@ -78,8 +87,10 @@ data = {
 
 df = pd.DataFrame(data)
 
+df["UF"] = 23
+df["Ui"] = 23
 df_pivot = create_pivot_table_with_multindex(
-    dataframe=df, index="ID", columns=["Pilar", "Tema"], values="Valor"
+    dataframe=df, index=["ID", "UF"], columns=["Pilar", "Tema"], values="Valor"
 )
 
 score_pilar_map = ScorePilarMap(
@@ -133,7 +144,7 @@ def generate_html_table(
     score_tema_map: ScoreTemaMap,
     score_pilar_map: ScorePilarMap,
     index_columns: List[str],
-    rows_per_page: int = 1
+    rows_per_page: int = 4
 ) -> str:
     def get_cell_format(value):
         for farol in score_farol_map.farol_list:
@@ -269,13 +280,14 @@ def generate_html_table(
       <th class="sortable" data-column="{pilar}-{tema}" style="background-color: {tema_info};">
         {tema}
       </th>"""
+
     html_string += "</tr></thead><tbody id='table-body'>"
 
     # AGENCIA
-    for row_index, row_data in dataframe.iterrows():
+    for row_index, (index_values, row_data) in enumerate(dataframe.iterrows()):
         html_string += "<tr>"
-        html_string += f"<td class='index'>{str(row_index).zfill(4)}</td>"
-
+        for value in index_values:
+            html_string += f'<td class="agencia">{value}</td>'
         for pilar in dataframe.columns.levels[0]:
             for tema in dataframe[pilar].columns:
                 valor = row_data.get((pilar, tema), 0)
@@ -299,7 +311,7 @@ def generate_html_table(
 document.addEventListener('DOMContentLoaded', function() {
   const rowsPerPage = """ + str(rows_per_page) + """;
   let currentPage = 1;
-  let sortState = 0;  // 0: neutral, 1: ascending, 2: descending
+  let sortState = {};  // Object to hold sort state for each column
 
   // Function to render the table based on the current page
   function renderTable() {
@@ -364,14 +376,17 @@ document.addEventListener('DOMContentLoaded', function() {
     const rows = Array.from(document.querySelectorAll('#emp-table tbody tr'));
     const headerCells = Array.from(document.querySelectorAll('#emp-table thead th'));
 
-    if (sortState === 0) {
+    // Determine the current sort state for the column
+    let sortDirection = sortState[columnClass] || 0; // 0: neutral, 1: ascending, 2: descending
+
+    if (sortDirection === 0) {
       // Reset to the original order by ID
       rows.sort((a, b) => {
         const idA = parseInt(a.querySelector('td.index').innerText.trim());
         const idB = parseInt(b.querySelector('td.index').innerText.trim());
         return idA - idB;
       });
-    } else if (sortState === 1) {
+    } else if (sortDirection === 1) {
       // Sort rows ascending by the selected column
       rows.sort((a, b) => {
         const cellA = a.querySelector(`td[data-column="${columnClass}"]`).innerText.trim();
@@ -380,7 +395,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const valueB = parseFloat(cellB) || 0;
         return valueA - valueB;
       });
-    } else if (sortState === 2) {
+    } else if (sortDirection === 2) {
       // Sort rows descending by the selected column
       rows.sort((a, b) => {
         const cellA = a.querySelector(`td[data-column="${columnClass}"]`).innerText.trim();
@@ -398,14 +413,16 @@ document.addEventListener('DOMContentLoaded', function() {
       tableBody.appendChild(row);
     });
 
-    // Cycle through sort states: neutral -> ascending -> descending -> neutral
-    sortState = (sortState + 1) % 3;
+    // Update sort state
+    sortDirection = (sortDirection + 1) % 3; // Cycle through sort states
+    sortState[columnClass] = sortDirection;
+
     headerCells.forEach((th) => {
       th.classList.remove('th-sort-asc', 'th-sort-desc');
       if (th.dataset.column === columnClass) {
-        if (sortState === 2) {
+        if (sortDirection === 2) {
           th.classList.add('th-sort-asc');
-        } else if (sortState === 0) {
+        } else if (sortDirection === 1) {
           th.classList.add('th-sort-desc');
         }
       }
@@ -433,7 +450,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 
 html_output = generate_html_table(
-    df_pivot, score_farol_map, score_tema_map, score_pilar_map, index_columns=["ID"]
+    df_pivot, score_farol_map, score_tema_map, score_pilar_map, index_columns=["ID", "UF"]
 )
 
 html(html_output, height=500)

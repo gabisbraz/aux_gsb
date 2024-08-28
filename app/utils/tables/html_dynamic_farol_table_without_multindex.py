@@ -92,9 +92,10 @@ data = {
 }
 
 df = pd.DataFrame(data)
+df["UF"] = "SP"
 
 df_pivot = create_pivot_table_with_multindex(
-    dataframe=df, index="ID", columns=["Pilar", "Tema"], values="Valor"
+    dataframe=df, index=["ID", "UF"], columns=["Pilar", "Tema"], values="Valor"
 )
 
 score_pilar_map = ScorePilarMap(
@@ -257,11 +258,9 @@ def generate_html_table(
                 return getattr(obj, arg_wanted)
         return None
 
-    # Headers
     for index_column in index_columns:
         html_string += f'<th class="index" rowspan="2">{index_column}</th>'
 
-    # PILAR
     for pilar in dataframe.columns.levels[0]:
         qtd_temas_no_pilar = len(dataframe[pilar].columns)
         pilar_info = (
@@ -271,7 +270,6 @@ def generate_html_table(
         html_string += f'<th colspan="{qtd_temas_no_pilar}" style="background-color: {pilar_info}; border: 1px solid #D5D5DB;">{pilar}</th>'
     html_string += "</tr><tr>"
 
-    # TEMA
     for pilar in dataframe.columns.levels[0]:
         for tema in dataframe[pilar].columns:
             col_index += 1
@@ -285,10 +283,10 @@ def generate_html_table(
       </th>"""
     html_string += "</tr></thead><tbody id='table-body'>"
 
-    # AGENCIA
-    for row_index, row_data in dataframe.iterrows():
+    for _, row_data in dataframe.iterrows():
         html_string += "<tr>"
-        html_string += f"<td class='index'>{str(row_index).zfill(4)}</td>"
+        for index_column in row_data.name:
+            html_string += f"<td class='index'>{index_column}</td>"
 
         for pilar in dataframe.columns.levels[0]:
             for tema in dataframe[pilar].columns:
@@ -451,7 +449,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
 
 html_output = generate_html_table(
-    df_pivot, score_farol_map, score_tema_map, score_pilar_map, index_columns=["ID"]
+    df_pivot,
+    score_farol_map,
+    score_tema_map,
+    score_pilar_map,
+    index_columns=["ID", "UF"],
 )
 
 html(html_output, height=500)

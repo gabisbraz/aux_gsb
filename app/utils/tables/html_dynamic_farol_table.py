@@ -1,18 +1,9 @@
-import sys
-import base64
 from pathlib import Path
 
 import pandas as pd
-import streamlit as st
-from loguru import logger
 
-DIR_ROOT = str(Path(__file__).parent.parent.parent)
-sys.path.append(DIR_ROOT)
-
-from dataclasses import dataclass
 from typing import Dict, List
-import pandas as pd
-import streamlit as st
+from dataclasses import dataclass
 from streamlit.components.v1 import html
 
 
@@ -56,6 +47,7 @@ class Farol:
 class ScoreFarolMap:
     farol_list: List[Farol]
 
+
 def create_pivot_table_with_multindex(
     dataframe: pd.DataFrame,
     index: str = None,
@@ -66,29 +58,46 @@ def create_pivot_table_with_multindex(
     df_pivot = dataframe.pivot_table(
         index=index, columns=columns, values=values, aggfunc="first"
     )
-    
+
     return df_pivot.sort_index(axis=axis, level=list(range(len(columns))))
 
 
+# Dados iniciais
 data = {
     "ID": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
     "Pilar": [
-        "Pilar 1", "Pilar 1", "Pilar 3", "Pilar 4",
-        "Pilar 1", "Pilar 2", "Pilar 3", "Pilar 4",
-        "Pilar 1", "Pilar 2"
+        "Pilar 1",
+        "Pilar 1",
+        "Pilar 3",
+        "Pilar 4",
+        "Pilar 1",
+        "Pilar 2",
+        "Pilar 3",
+        "Pilar 4",
+        "Pilar 1",
+        "Pilar 2",
     ],
     "Tema": [
-        "Tema 1", "Tema 1", "Tema 3", "Tema 1",
-        "Tema 1", "Tema 3", "Tema 1", "Tema 2",
-        "Tema 3", "Tema 1"
+        "Tema 1",
+        "Tema 1",
+        "Tema 3",
+        "Tema 1",
+        "Tema 1",
+        "Tema 3",
+        "Tema 1",
+        "Tema 2",
+        "Tema 3",
+        "Tema 1",
     ],
     "Valor": [8.5, 4.3, 6.2, 7.1, 5.4, 9.0, 6.5, 7.8, 5.6, 3.2],
 }
 
 df = pd.DataFrame(data)
+repetitions = 4000 // len(df)
+df = pd.concat([df] * repetitions, ignore_index=True)
+df["ID"] = range(1, len(df) + 1)
+df["UF"] = "SP"
 
-df["UF"] = 23
-df["Ui"] = 23
 df_pivot = create_pivot_table_with_multindex(
     dataframe=df, index=["ID", "UF"], columns=["Pilar", "Tema"], values="Valor"
 )
@@ -112,9 +121,7 @@ score_tema_map = ScoreTemaMap(
 
 score_farol_map = ScoreFarolMap(
     [
-        Farol(
-            "vermelho", "vermelho", "red", "black", "bi bi-x-circle", "red", 0, 3.33
-        ),
+        Farol("vermelho", "vermelho", "red", "black", "bi bi-x-circle", "red", 0, 3.33),
         Farol(
             "amarelo",
             "amarelo",
@@ -138,13 +145,14 @@ score_farol_map = ScoreFarolMap(
     ]
 )
 
+
 def generate_html_table(
     dataframe: pd.DataFrame,
     score_farol_map: ScoreFarolMap,
     score_tema_map: ScoreTemaMap,
     score_pilar_map: ScorePilarMap,
     index_columns: List[str],
-    rows_per_page: int = 4
+    rows_per_page: int = 7,
 ) -> str:
     def get_cell_format(value):
         for farol in score_farol_map.farol_list:
@@ -254,11 +262,9 @@ def generate_html_table(
                 return getattr(obj, arg_wanted)
         return None
 
-    # Headers
     for index_column in index_columns:
         html_string += f'<th class="index" rowspan="2">{index_column}</th>'
 
-    # PILAR
     for pilar in dataframe.columns.levels[0]:
         qtd_temas_no_pilar = len(dataframe[pilar].columns)
         pilar_info = (
@@ -268,7 +274,6 @@ def generate_html_table(
         html_string += f'<th colspan="{qtd_temas_no_pilar}" style="background-color: {pilar_info}; border: 1px solid #D5D5DB;">{pilar}</th>'
     html_string += "</tr><tr>"
 
-    # TEMA
     for pilar in dataframe.columns.levels[0]:
         for tema in dataframe[pilar].columns:
             col_index += 1
@@ -280,14 +285,13 @@ def generate_html_table(
       <th class="sortable" data-column="{pilar}-{tema}" style="background-color: {tema_info};">
         {tema}
       </th>"""
-
     html_string += "</tr></thead><tbody id='table-body'>"
 
-    # AGENCIA
-    for row_index, (index_values, row_data) in enumerate(dataframe.iterrows()):
+    for _, row_data in dataframe.iterrows():
         html_string += "<tr>"
-        for value in index_values:
-            html_string += f'<td class="agencia">{value}</td>'
+        for index_column in row_data.name:
+            html_string += f"<td class='index'>{index_column}</td>"
+
         for pilar in dataframe.columns.levels[0]:
             for tema in dataframe[pilar].columns:
                 valor = row_data.get((pilar, tema), 0)
@@ -306,12 +310,16 @@ def generate_html_table(
 
     html_string += css
 
-    js_script = """
+    js_script = (
+        """
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-  const rowsPerPage = """ + str(rows_per_page) + """;
+  const rowsPerPage = """
+        + str(rows_per_page)
+        + """;
   let currentPage = 1;
-  let sortState = {};  // Object to hold sort state for each column
+  let sortState = 0;  // 0: neutral, 1: ascending, 2: descending
+  const maxVisiblePages = 5;
 
   // Function to render the table based on the current page
   function renderTable() {
@@ -333,8 +341,11 @@ document.addEventListener('DOMContentLoaded', function() {
     const pagination = document.getElementById('pagination');
     const totalRows = document.querySelectorAll('#emp-table tbody tr').length;
     const totalPages = Math.ceil(totalRows / rowsPerPage);
+    let startPage = Math.max(currentPage - Math.floor(maxVisiblePages / 2), 1);
+    let endPage = Math.min(startPage + maxVisiblePages - 1, totalPages);
 
     pagination.innerHTML = '';
+
     if (totalPages > 1) {
       if (currentPage > 1) {
         const prevButton = document.createElement('button');
@@ -346,7 +357,21 @@ document.addEventListener('DOMContentLoaded', function() {
         pagination.appendChild(prevButton);
       }
 
-      for (let i = 1; i <= totalPages; i++) {
+      if (startPage > 1) {
+        const firstPageButton = document.createElement('button');
+        firstPageButton.textContent = '1';
+        firstPageButton.addEventListener('click', () => {
+          currentPage = 1;
+          renderTable();
+        });
+        pagination.appendChild(firstPageButton);
+
+        const leftEllipsis = document.createElement('span');
+        leftEllipsis.textContent = '...';
+        pagination.appendChild(leftEllipsis);
+      }
+
+      for (let i = startPage; i <= endPage; i++) {
         const button = document.createElement('button');
         button.textContent = i;
         if (i === currentPage) {
@@ -357,6 +382,20 @@ document.addEventListener('DOMContentLoaded', function() {
           renderTable();
         });
         pagination.appendChild(button);
+      }
+
+      if (endPage < totalPages) {
+        const rightEllipsis = document.createElement('span');
+        rightEllipsis.textContent = '...';
+        pagination.appendChild(rightEllipsis);
+
+        const lastPageButton = document.createElement('button');
+        lastPageButton.textContent = totalPages;
+        lastPageButton.addEventListener('click', () => {
+          currentPage = totalPages;
+          renderTable();
+        });
+        pagination.appendChild(lastPageButton);
       }
 
       if (currentPage < totalPages) {
@@ -376,17 +415,14 @@ document.addEventListener('DOMContentLoaded', function() {
     const rows = Array.from(document.querySelectorAll('#emp-table tbody tr'));
     const headerCells = Array.from(document.querySelectorAll('#emp-table thead th'));
 
-    // Determine the current sort state for the column
-    let sortDirection = sortState[columnClass] || 0; // 0: neutral, 1: ascending, 2: descending
-
-    if (sortDirection === 0) {
+    if (sortState === 0) {
       // Reset to the original order by ID
       rows.sort((a, b) => {
         const idA = parseInt(a.querySelector('td.index').innerText.trim());
         const idB = parseInt(b.querySelector('td.index').innerText.trim());
         return idA - idB;
       });
-    } else if (sortDirection === 1) {
+    } else if (sortState === 1) {
       // Sort rows ascending by the selected column
       rows.sort((a, b) => {
         const cellA = a.querySelector(`td[data-column="${columnClass}"]`).innerText.trim();
@@ -395,7 +431,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const valueB = parseFloat(cellB) || 0;
         return valueA - valueB;
       });
-    } else if (sortDirection === 2) {
+    } else if (sortState === 2) {
       // Sort rows descending by the selected column
       rows.sort((a, b) => {
         const cellA = a.querySelector(`td[data-column="${columnClass}"]`).innerText.trim();
@@ -413,16 +449,14 @@ document.addEventListener('DOMContentLoaded', function() {
       tableBody.appendChild(row);
     });
 
-    // Update sort state
-    sortDirection = (sortDirection + 1) % 3; // Cycle through sort states
-    sortState[columnClass] = sortDirection;
-
+    // Cycle through sort states: neutral -> ascending -> descending -> neutral
+    sortState = (sortState + 1) % 3;
     headerCells.forEach((th) => {
       th.classList.remove('th-sort-asc', 'th-sort-desc');
       if (th.dataset.column === columnClass) {
-        if (sortDirection === 2) {
+        if (sortState === 2) {
           th.classList.add('th-sort-asc');
-        } else if (sortDirection === 1) {
+        } else if (sortState === 0) {
           th.classList.add('th-sort-desc');
         }
       }
@@ -444,13 +478,18 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 """
+    )
 
     html_string += js_script
     return html_string
 
 
 html_output = generate_html_table(
-    df_pivot, score_farol_map, score_tema_map, score_pilar_map, index_columns=["ID", "UF"]
+    df_pivot,
+    score_farol_map,
+    score_tema_map,
+    score_pilar_map,
+    index_columns=["ID", "UF"],
 )
 
 html(html_output, height=500)

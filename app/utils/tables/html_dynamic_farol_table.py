@@ -1,5 +1,5 @@
 from pathlib import Path
-
+import streamlit as st
 import pandas as pd
 
 from typing import Dict, List
@@ -97,50 +97,91 @@ repetitions = 4000 // len(df)
 df = pd.concat([df] * repetitions, ignore_index=True)
 df["ID"] = range(1, len(df) + 1)
 df["UF"] = "SP"
+df["DINEG"] = "7"
+df["MUNICIPIO"] = "OSASCO"
 
-df_pivot = create_pivot_table_with_multindex(
-    dataframe=df, index=["ID", "UF"], columns=["Pilar", "Tema"], values="Valor"
-)
 
-score_pilar_map = ScorePilarMap(
-    [
-        Pilar("Pilar 1", "pilar1", "#FFCCCC"),
-        Pilar("Pilar 2", "pilar2", "#CCFFCC"),
-        Pilar("Pilar 3", "pilar3", "#CCCCFF"),
-        Pilar("Pilar 4", "pilar4", "#FFFFCC"),
+score_tema_map = ScoreTemaMap(
+    tema_list=[
+        Tema(
+            nome_front="INFRA CIVIL",
+            nome_etl="INFRA CIVIL",
+            cor="#F8F9FB",
+        ),
+        Tema(
+            nome_front="REGULATÓRIO",
+            nome_etl="REGULATÓRIO",
+            cor="#F8F9FB",
+        ),
+        Tema(
+            nome_front="SEGURANÇA",
+            nome_etl="SEGURANÇA",
+            cor="#F8F9FB",
+        ),
+        Tema(
+            nome_front="ESG",
+            nome_etl="ESG",
+            cor="#F8F9FB",
+        ),
     ]
 )
 
-score_tema_map = ScoreTemaMap(
-    [
-        Tema("Tema 1", "tema1", "#FFAAAA"),
-        Tema("Tema 2", "tema2", "#AAFFAA"),
-        Tema("Tema 3", "tema3", "#AAAAFF"),
+score_pilar_map = ScorePilarMap(
+    pilar_list=[
+        Pilar(
+            nome_etl="EFICIÊNCIA",
+            nome_front="EFICIÊNCIA",
+            cor="#EFF2F6",
+        ),
+        Pilar(
+            nome_etl="PERFORMANCE",
+            nome_front="PERFORMANCE",
+            cor="#EFF2F6",
+        ),
+        Pilar(
+            nome_etl="RISCO",
+            nome_front="RISCO",
+            cor="#EFF2F6",
+        ),
+        Pilar(
+            nome_etl="ESG",
+            nome_front="ESG",
+            cor="#EFF2F6",
+        ),
     ]
 )
 
 score_farol_map = ScoreFarolMap(
-    [
-        Farol("vermelho", "vermelho", "red", "black", "bi bi-x-circle", "red", 0, 3.33),
+    farol_list=[
         Farol(
-            "amarelo",
-            "amarelo",
-            "yellow",
-            "black",
-            "bi bi-exclamation-circle",
-            "yellow",
-            3.34,
-            6.66,
+            nome_etl="vermelho",
+            nome_front="Agências críticas",
+            cor="white",
+            cor_fonte="white",
+            cor_icone="red",
+            icones="bi bi-x-circle-fill",
+            valor_min=0,
+            valor_max=3.3,
         ),
         Farol(
-            "verde",
-            "verde",
-            "green",
-            "black",
-            "bi bi-check-circle",
-            "green",
-            6.67,
-            10,
+            nome_etl="amarelo",
+            nome_front="Agências medianas",
+            cor="white",
+            cor_fonte="white",
+            cor_icone="#B68105",
+            icones="bi bi-dash-circle-fill",
+            valor_min=3.31,
+            valor_max=6.6,
+        ),
+        Farol(
+            nome_etl="verde",
+            nome_front="Agências ótimas",
+            cor="white",
+            cor_fonte="white",
+            cor_icone="green",
+            icones="bi bi-check-circle-fill",
+            valor_min=6.61,
+            valor_max=10,
         ),
     ]
 )
@@ -152,7 +193,7 @@ def generate_html_table(
     score_tema_map: ScoreTemaMap,
     score_pilar_map: ScorePilarMap,
     index_columns: List[str],
-    rows_per_page: int = 7,
+    rows_per_page: int = 10,
 ) -> str:
     def get_cell_format(value):
         for farol in score_farol_map.farol_list:
@@ -163,97 +204,120 @@ def generate_html_table(
     css = """
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css">
     <style>
-      table {
+    table {
         width: 100%;
         border-collapse: collapse;
-      }
-      th, td {
+        overflow-x: auto;
+        display: block;
+        white-space: nowrap;
+    }
+    th, td {
         padding: 8px;
         text-align: center;
         border: 1px solid #D5D5DB;
-        font-family: "sans serif";
-      }
-      td {
+        font-family: "arial";
+        font-size: 14px;
+    }
+    td {
         background-color: white;
-        font-family: "sans serif";
-      }
-      th {
+        font-family: "arial";
+        font-size: 14px;
+    }
+    th {
         background-color: white;
-        font-family: "sans serif";
-      }
-      th.agencia {
-        position: sticky;
-        left: 0;
+        font-family: "arial";
+        font-size: 14px;
+    }
+    th.agencia {
         background-color: white;
-        z-index: 3;
         color: black;
-        font-family: "sans serif";
-      }
-      th.index {
-        z-index: 3;
-        position: sticky;
-      }
-      td.agencia {
-        position: sticky;
-        left: 0;
+        font-family: "arial";
+        font-size: 14px;
+    }
+    th.index {
         background-color: white;
-        z-index: 2;
+    }
+    td.agencia {
+        background-color: white;
         border-radius: 0px;
         color: black;
-      }
-      .filter-select {
+    }
+    .filter-select {
         width: 100%;
-      }
-      th[colspan] {
+    }
+    th[colspan] {
         border-top-left-radius: 0px;
         border-top-right-radius: 0px;
         border-top: 0px;
         border-right: 0px;
         border-left: 0px;
-      }
-      th.sortable {
+    }
+    th.sortable {
         cursor: pointer;
-      }
-      th.sortable.th-sort-asc::after {
+    }
+    th.sortable.th-sort-asc::after {
         content: "\\25b4";
-      }
-      th.sortable.th-sort-desc::after {
+    }
+    th.sortable.th-sort-desc::after {
         content: "\\25be";
-      }
-      th.sortable.th-sort-asc::after,
-      th.sortable.th-sort-desc::after {
+    }
+    th.sortable.th-sort-asc::after,
+    th.sortable.th-sort-desc::after {
         margin-left: 5px;
-      }
-      th.sortable.th-sort-asc,
-      th.sortable.th-sort-desc {
+    }
+    th.sortable.th-sort-asc,
+    th.sortable.th-sort-desc {
         background: rgba(0, 0, 0, 0.1);
-      }
-      .pagination {
-        text-align: center;
+    }
+    .pagination {
+        text-align: right;
         margin: 10px 0;
-      }
-      .pagination button {
+    }
+    .pagination button {
         border: 1px solid #ddd;
         background-color: white;
         padding: 5px 10px;
         margin: 0 2px;
         cursor: pointer;
-      }
-      .pagination button.active {
-        background-color: #007bff;
+        border-radius: 10px;
+    }
+    .pagination button.active {
+        background-color: #D86C00;
         color: white;
-      }
-      .pagination button.disabled {
+    }
+    .pagination button.disabled {
         cursor: not-allowed;
         opacity: 0.5;
-      }
+    }
+
+    /* Scrollbar Styling */
+    #table-container {
+        overflow-x: auto;
+        overflow-y: auto;
+    }
+    #table-container::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+    }
+    #table-container::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 10px;
+    }
+    #table-container::-webkit-scrollbar-thumb {
+        background-color: #b3b3b3;
+        border-radius: 10px;
+    }
+    #table-container::-webkit-scrollbar-thumb:hover {
+        background-color: #a6a6a6;
+    }
     </style>"""
 
-    html_string = """        
+    html_string = """    
     <div id="table-container">
-      <table id="emp-table">
+    <table id="emp-table">
         <thead>
-          <tr>"""
+        <tr>"""
+
     col_index = len(index_columns)
 
     def get_class_info(id_obj, id_value, arg_wanted, data_class_list):
@@ -282,15 +346,18 @@ def generate_html_table(
                 or "white"
             )
             html_string += f"""
-      <th class="sortable" data-column="{pilar}-{tema}" style="background-color: {tema_info};">
-        {tema}
-      </th>"""
+   <th class="sortable" data-column="{pilar}-{tema}" style="background-color: {tema_info}; min-width: 50px;">
+    {tema}
+   </th>"""
     html_string += "</tr></thead><tbody id='table-body'>"
 
     for _, row_data in dataframe.iterrows():
         html_string += "<tr>"
-        for index_column in row_data.name:
-            html_string += f"<td class='index'>{index_column}</td>"
+        if not isinstance(row_data.name, int):
+            for index_column in row_data.name:
+                html_string += f"<td class='index'>{str(index_column)}</td>"
+        else:
+            html_string += f"<td class='index'>{row_data.name}</td>"
 
         for pilar in dataframe.columns.levels[0]:
             for tema in dataframe[pilar].columns:
@@ -300,13 +367,13 @@ def generate_html_table(
         html_string += "</tr>"
 
     html_string += """
-      </tbody>
-    </table>
-    <div class="pagination" id="pagination"></div>
-    </div>
-    </body>
-    </html>
-    """
+   </tbody>
+  </table>
+  <div class="pagination" id="pagination"></div>
+  </div>
+  </body>
+  </html>
+  """
 
     html_string += css
 
@@ -314,167 +381,167 @@ def generate_html_table(
         """
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-  const rowsPerPage = """
+ const rowsPerPage = """
         + str(rows_per_page)
         + """;
-  let currentPage = 1;
-  let sortState = 0;  // 0: neutral, 1: ascending, 2: descending
-  const maxVisiblePages = 5;
+ let currentPage = 1;
+ let sortState = 0; // 0: neutral, 1: ascending, 2: descending
+ const maxVisiblePages = 5;
 
-  // Function to render the table based on the current page
-  function renderTable() {
-    const rows = Array.from(document.querySelectorAll('#emp-table tbody tr'));
-    const start = (currentPage - 1) * rowsPerPage;
-    const end = start + rowsPerPage;
+ // Function to render the table based on the current page
+ function renderTable() {
+  const rows = Array.from(document.querySelectorAll('#emp-table tbody tr'));
+  const start = (currentPage - 1) * rowsPerPage;
+  const end = start + rowsPerPage;
 
-    // Hide all rows
-    rows.forEach((row, index) => {
-      row.style.display = (index >= start && index < end) ? '' : 'none';
-    });
-
-    // Update pagination
-    updatePagination();
-  }
-
-  // Function to update pagination buttons
-  function updatePagination() {
-    const pagination = document.getElementById('pagination');
-    const totalRows = document.querySelectorAll('#emp-table tbody tr').length;
-    const totalPages = Math.ceil(totalRows / rowsPerPage);
-    let startPage = Math.max(currentPage - Math.floor(maxVisiblePages / 2), 1);
-    let endPage = Math.min(startPage + maxVisiblePages - 1, totalPages);
-
-    pagination.innerHTML = '';
-
-    if (totalPages > 1) {
-      if (currentPage > 1) {
-        const prevButton = document.createElement('button');
-        prevButton.textContent = 'Previous';
-        prevButton.addEventListener('click', () => {
-          currentPage--;
-          renderTable();
-        });
-        pagination.appendChild(prevButton);
-      }
-
-      if (startPage > 1) {
-        const firstPageButton = document.createElement('button');
-        firstPageButton.textContent = '1';
-        firstPageButton.addEventListener('click', () => {
-          currentPage = 1;
-          renderTable();
-        });
-        pagination.appendChild(firstPageButton);
-
-        const leftEllipsis = document.createElement('span');
-        leftEllipsis.textContent = '...';
-        pagination.appendChild(leftEllipsis);
-      }
-
-      for (let i = startPage; i <= endPage; i++) {
-        const button = document.createElement('button');
-        button.textContent = i;
-        if (i === currentPage) {
-          button.classList.add('active');
-        }
-        button.addEventListener('click', () => {
-          currentPage = i;
-          renderTable();
-        });
-        pagination.appendChild(button);
-      }
-
-      if (endPage < totalPages) {
-        const rightEllipsis = document.createElement('span');
-        rightEllipsis.textContent = '...';
-        pagination.appendChild(rightEllipsis);
-
-        const lastPageButton = document.createElement('button');
-        lastPageButton.textContent = totalPages;
-        lastPageButton.addEventListener('click', () => {
-          currentPage = totalPages;
-          renderTable();
-        });
-        pagination.appendChild(lastPageButton);
-      }
-
-      if (currentPage < totalPages) {
-        const nextButton = document.createElement('button');
-        nextButton.textContent = 'Next';
-        nextButton.addEventListener('click', () => {
-          currentPage++;
-          renderTable();
-        });
-        pagination.appendChild(nextButton);
-      }
-    }
-  }
-
-  // Function to sort the table based on a column
-  function sortTable(columnClass) {
-    const rows = Array.from(document.querySelectorAll('#emp-table tbody tr'));
-    const headerCells = Array.from(document.querySelectorAll('#emp-table thead th'));
-
-    if (sortState === 0) {
-      // Reset to the original order by ID
-      rows.sort((a, b) => {
-        const idA = parseInt(a.querySelector('td.index').innerText.trim());
-        const idB = parseInt(b.querySelector('td.index').innerText.trim());
-        return idA - idB;
-      });
-    } else if (sortState === 1) {
-      // Sort rows ascending by the selected column
-      rows.sort((a, b) => {
-        const cellA = a.querySelector(`td[data-column="${columnClass}"]`).innerText.trim();
-        const cellB = b.querySelector(`td[data-column="${columnClass}"]`).innerText.trim();
-        const valueA = parseFloat(cellA) || 0;
-        const valueB = parseFloat(cellB) || 0;
-        return valueA - valueB;
-      });
-    } else if (sortState === 2) {
-      // Sort rows descending by the selected column
-      rows.sort((a, b) => {
-        const cellA = a.querySelector(`td[data-column="${columnClass}"]`).innerText.trim();
-        const cellB = b.querySelector(`td[data-column="${columnClass}"]`).innerText.trim();
-        const valueA = parseFloat(cellA) || 0;
-        const valueB = parseFloat(cellB) || 0;
-        return valueB - valueA;
-      });
-    }
-
-    // Re-render rows after sorting
-    const tableBody = document.getElementById('table-body');
-    tableBody.innerHTML = '';
-    rows.forEach(row => {
-      tableBody.appendChild(row);
-    });
-
-    // Cycle through sort states: neutral -> ascending -> descending -> neutral
-    sortState = (sortState + 1) % 3;
-    headerCells.forEach((th) => {
-      th.classList.remove('th-sort-asc', 'th-sort-desc');
-      if (th.dataset.column === columnClass) {
-        if (sortState === 2) {
-          th.classList.add('th-sort-asc');
-        } else if (sortState === 0) {
-          th.classList.add('th-sort-desc');
-        }
-      }
-    });
-
-    // Re-render the table with sorted data
-    renderTable();
-  }
-
-  // Attach click event listeners to sortable headers
-  document.querySelectorAll('th.sortable').forEach(th => {
-    th.addEventListener('click', () => {
-      sortTable(th.dataset.column);
-    });
+  // Hide all rows
+  rows.forEach((row, index) => {
+   row.style.display = (index >= start && index < end) ? '' : 'none';
   });
 
-  // Initialize the table and render it
+  // Update pagination
+  updatePagination();
+ }
+
+ // Function to update pagination buttons
+ function updatePagination() {
+  const pagination = document.getElementById('pagination');
+  const totalRows = document.querySelectorAll('#emp-table tbody tr').length;
+  const totalPages = Math.ceil(totalRows / rowsPerPage);
+  let startPage = Math.max(currentPage - Math.floor(maxVisiblePages / 2), 1);
+  let endPage = Math.min(startPage + maxVisiblePages - 1, totalPages);
+
+  pagination.innerHTML = '';
+
+  if (totalPages > 1) {
+   if (currentPage > 1) {
+    const prevButton = document.createElement('button');
+    prevButton.textContent = 'Anterior';
+    prevButton.addEventListener('click', () => {
+     currentPage--;
+     renderTable();
+    });
+    pagination.appendChild(prevButton);
+   }
+
+   if (startPage > 1) {
+    const firstPageButton = document.createElement('button');
+    firstPageButton.textContent = '1';
+    firstPageButton.addEventListener('click', () => {
+     currentPage = 1;
+     renderTable();
+    });
+    pagination.appendChild(firstPageButton);
+
+    const leftEllipsis = document.createElement('span');
+    leftEllipsis.textContent = '...';
+    pagination.appendChild(leftEllipsis);
+   }
+
+   for (let i = startPage; i <= endPage; i++) {
+    const button = document.createElement('button');
+    button.textContent = i;
+    if (i === currentPage) {
+     button.classList.add('active');
+    }
+    button.addEventListener('click', () => {
+     currentPage = i;
+     renderTable();
+    });
+    pagination.appendChild(button);
+   }
+
+   if (endPage < totalPages) {
+    const rightEllipsis = document.createElement('span');
+    rightEllipsis.textContent = '...';
+    pagination.appendChild(rightEllipsis);
+
+    const lastPageButton = document.createElement('button');
+    lastPageButton.textContent = totalPages;
+    lastPageButton.addEventListener('click', () => {
+     currentPage = totalPages;
+     renderTable();
+    });
+    pagination.appendChild(lastPageButton);
+   }
+
+   if (currentPage < totalPages) {
+    const nextButton = document.createElement('button');
+    nextButton.textContent = 'Próximo';
+    nextButton.addEventListener('click', () => {
+     currentPage++;
+     renderTable();
+    });
+    pagination.appendChild(nextButton);
+   }
+  }
+ }
+
+ // Function to sort the table based on a column
+ function sortTable(columnClass) {
+  const rows = Array.from(document.querySelectorAll('#emp-table tbody tr'));
+  const headerCells = Array.from(document.querySelectorAll('#emp-table thead th'));
+
+  if (sortState === 0) {
+   // Reset to the original order by ID
+   rows.sort((a, b) => {
+    const idA = parseInt(a.querySelector('td.index').innerText.trim());
+    const idB = parseInt(b.querySelector('td.index').innerText.trim());
+    return idA - idB;
+   });
+  } else if (sortState === 1) {
+   // Sort rows ascending by the selected column
+   rows.sort((a, b) => {
+    const cellA = a.querySelector(`td[data-column="${columnClass}"]`).innerText.trim();
+    const cellB = b.querySelector(`td[data-column="${columnClass}"]`).innerText.trim();
+    const valueA = parseFloat(cellA) || 0;
+    const valueB = parseFloat(cellB) || 0;
+    return valueA - valueB;
+   });
+  } else if (sortState === 2) {
+   // Sort rows descending by the selected column
+   rows.sort((a, b) => {
+    const cellA = a.querySelector(`td[data-column="${columnClass}"]`).innerText.trim();
+    const cellB = b.querySelector(`td[data-column="${columnClass}"]`).innerText.trim();
+    const valueA = parseFloat(cellA) || 0;
+    const valueB = parseFloat(cellB) || 0;
+    return valueB - valueA;
+   });
+  }
+
+  // Re-render rows after sorting
+  const tableBody = document.getElementById('table-body');
+  tableBody.innerHTML = '';
+  rows.forEach(row => {
+   tableBody.appendChild(row);
+  });
+
+  // Cycle through sort states: neutral -> ascending -> descending -> neutral
+  sortState = (sortState + 1) % 3;
+  headerCells.forEach((th) => {
+   th.classList.remove('th-sort-asc', 'th-sort-desc');
+   if (th.dataset.column === columnClass) {
+    if (sortState === 2) {
+     th.classList.add('th-sort-asc');
+    } else if (sortState === 0) {
+     th.classList.add('th-sort-desc');
+    }
+   }
+  });
+
+  // Re-render the table with sorted data
   renderTable();
+ }
+
+ // Attach click event listeners to sortable headers
+ document.querySelectorAll('th.sortable').forEach(th => {
+  th.addEventListener('click', () => {
+   sortTable(th.dataset.column);
+  });
+ });
+
+ // Initialize the table and render it
+ renderTable();
 });
 </script>
 """
@@ -484,12 +551,27 @@ document.addEventListener('DOMContentLoaded', function() {
     return html_string
 
 
+colunas_selected = st.multiselect(
+    "Selecione as informações que deseja visualizar",
+    options=["UF", "MUNICIPIO", "DINEG"],
+)
+if colunas_selected:
+    colunas_selected = ["ID"] + colunas_selected
+else:
+    colunas_selected = ["ID"]
+
+df_pivot = create_pivot_table_with_multindex(
+    dataframe=df,
+    index=colunas_selected,
+    columns=["Pilar", "Tema"],
+    values="Valor",
+)
 html_output = generate_html_table(
     df_pivot,
     score_farol_map,
     score_tema_map,
     score_pilar_map,
-    index_columns=["ID", "UF"],
+    index_columns=colunas_selected,
 )
 
 html(html_output, height=500)

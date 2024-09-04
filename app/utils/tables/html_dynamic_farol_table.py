@@ -14,7 +14,6 @@ def generate_html_table(
 ) -> str:
     """FUNÇÃO RESPONSÁVEL POR CRIAR O HTML DA TABELA DE SCORE FAROL."""
 
-    # Lista para armazenar as partes do HTML
     html_parts = []
 
     # Carregamento do CSS
@@ -68,14 +67,22 @@ def generate_html_table(
                 )
     html_parts.append("</tr></thead><tbody id='table-body'>")
 
-    # Linhas da tabela
+    # Pré-processar df_combined para minimizar filtragens repetitivas
+    df_combined_cache = {
+        (pilar, tema): df_combined[
+            (df_combined["PILAR"] == pilar) & (df_combined["TEMA"] == tema)
+        ]
+        for pilar in ordem_pilares
+        for tema in dataframe[pilar].columns
+        if pilar in dataframe.columns.levels[0]
+    }
+
+    # Linhas da tabela em blocos
     dataframe_aux = dataframe.to_dict("index")
     for index_values, row_data in dataframe_aux.items():
-        html_parts.append("<tr>")
+        row_parts = ["<tr>"]
         for index_column in index_values:
-            html_parts.append(f"<td class='index'>{index_column}</td>")
-
-        df_agencia = df_combined.loc[df_combined["AGENCIA"] == index_values[0]]
+            row_parts.append(f"<td class='index'>{index_column}</td>")
 
         for pilar in ordem_pilares:
             if pilar in dataframe.columns.levels[0]:
@@ -83,15 +90,20 @@ def generate_html_table(
                     valor = row_data.get((pilar, tema), 0)
                     icone_color = None
                     icone_score = None
-                    df_agencia_pilar_tema = df_agencia.loc[
-                        (df_agencia["PILAR"] == pilar) & (df_agencia["TEMA"] == tema)
-                    ]
-                    if not df_agencia_pilar_tema.empty:
+                    df_agencia_pilar_tema = df_combined_cache.get((pilar, tema))
+
+                    if df_agencia_pilar_tema is not None:
                         icone_color = score_farol_map.get(
-                            df_agencia_pilar_tema["FAROL"].values[0], {}
+                            df_agencia_pilar_tema[
+                                df_agencia_pilar_tema["AGENCIA"] == index_values[0]
+                            ]["FAROL"].values[0],
+                            {},
                         ).get("color", "white")
                         icone_score = score_farol_map.get(
-                            df_agencia_pilar_tema["FAROL"].values[0], {}
+                            df_agencia_pilar_tema[
+                                df_agencia_pilar_tema["AGENCIA"] == index_values[0]
+                            ]["FAROL"].values[0],
+                            {},
                         ).get("icon", "bi bi-circle-fill")
                     try:
                         valor = f"{valor:.2f}"
@@ -100,7 +112,7 @@ def generate_html_table(
                         icone_color = None
                         icone_score = None
 
-                    html_parts.append(
+                    row_parts.append(
                         f'<td data-column="{pilar}-{tema}" style="color: black; text-align: center; min-width: 50px;">'
                         f'<div style="display: flex;">'
                         f'<div style="width: 50%; display: flex; justify-content: flex-end;">'
@@ -109,7 +121,8 @@ def generate_html_table(
                         f'<div style="width: 50%; display: flex; justify-content: flex-start;">{valor}</div>'
                         f"</div></td>"
                     )
-        html_parts.append("</tr>")
+        row_parts.append("</tr>")
+        html_parts.extend(row_parts)
 
     # Fecha a tabela e adiciona paginação
     html_parts.append(
